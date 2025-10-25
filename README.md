@@ -42,115 +42,83 @@
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- **Go** 1.23+ 
-- **Docker** & **Docker Compose** (recommended)
-- **PostgreSQL** 15+ (if not using Docker)
-
-### Option 1: Docker (Recommended)
-
 ```bash
 # Clone repository
 git clone <repository-url>
 cd auth-service
 
-# Copy and configure environment
-copy .env.example .env
-# Edit .env with your configuration
-
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f auth-service
-
-# Check health
-curl http://localhost:8080/health
-```
-
-### Option 2: Local Development
-
-```bash
 # Install dependencies
 go mod download
 
-# Start database
-docker-compose up -d postgres
-
-# Configure environment
-copy .env.example .env
-
-# Run application
+# Run the application
 go run cmd/server/main.go
-
-# Or with hot reload (requires Air)
-air
 ```
 
 ---
 
-## 🔧 Available Commands
+## 🔧 Development Commands
 
-### Using PowerShell Script (Recommended for Windows)
-
-```powershell
-# Development
-.\build.ps1 dev           # Hot reload with Air
-.\build.ps1 run           # Run directly
-.\build.ps1 build         # Build binary
-.\build.ps1 clean         # Clean artifacts
-
-# Testing
-.\build.ps1 test          # Run tests
-.\build.ps1 test-cover    # Generate coverage
-
-# Quality
-.\build.ps1 fmt           # Format code
-.\build.ps1 vet           # Run go vet
-.\build.ps1 tidy          # Tidy dependencies
-.\build.ps1 lint          # Run linter (if installed)
-
-# Docker
-.\build.ps1 docker-up     # Start all services
-.\build.ps1 docker-down   # Stop services
-.\build.ps1 docker-logs   # View logs
-
-# Utilities
-.\build.ps1 install-tools # Install Air & golangci-lint
-.\build.ps1 help          # Show all commands
-```
-
-### Using Makefile (If make is installed)
+### Running the Application
 
 ```bash
-# Same commands but with make prefix
-make dev
-make test
-make docker-up
-make help
+# Development mode (direct run)
+go run cmd/server/main.go
+
+# With hot reload (requires Air)
+air
+
+# Build binary
+go build -o auth-service.exe cmd/server/main.go  # Windows
+go build -o auth-service cmd/server/main.go      # Linux/Mac
+
+# Run binary
+./auth-service.exe  # Windows
+./auth-service      # Linux/Mac
 ```
 
-### Manual Commands (Without Scripts)
+### Code Quality
 
-```powershell
-# Development
-go run cmd/server/main.go                           # Run
-go build -o auth-service.exe cmd/server/main.go     # Build
+```bash
+# Format code
+go fmt ./...
 
-# Testing
-go test -v ./...                                     # Run tests
-go test -v -coverprofile=coverage.out ./...         # Coverage
+# Run static analysis
+go vet ./...
 
-# Docker
-docker-compose up -d                                 # Start
-docker-compose logs -f auth-service                  # Logs
-docker-compose down                                  # Stop
+# Run linter (if golangci-lint installed)
+golangci-lint run
 
-# Quality
-go fmt ./...                                         # Format
-go vet ./...                                         # Vet
+# Tidy dependencies
+go mod tidy
+go mod verify
 ```
+
+### Testing
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests with verbose output
+go test -v ./...
+
+# Run tests with coverage
+go test -v -coverprofile=coverage.out ./...
+
+# View coverage report
+go tool cover -html=coverage.out
+```
+
+### Development Tools
+
+```bash
+# Install Air (hot reload)
+go install github.com/air-verse/air@latest
+
+# Install golangci-lint (linter)
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+```
+
 ---
 
 ## 🤝 Contributing
