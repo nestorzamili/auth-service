@@ -39,6 +39,7 @@ Thumbs.db
 # Logs
 *.log
 build-errors.log
+logs/
 
 # Temporary files
 tmp/

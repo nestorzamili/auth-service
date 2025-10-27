@@ -53,6 +53,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if rw := middleware.GetResponseWriter(w); rw != nil {
+		rw.SetUserID(response.User.ID)
+	}
+
 	writeJSendSuccess(w, http.StatusCreated, response)
 }
 
@@ -82,6 +86,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			writeAppError(w, apperrors.Internal("login failed"))
 		}
 		return
+	}
+
+	if rw := middleware.GetResponseWriter(w); rw != nil {
+		rw.SetUserID(response.User.ID)
 	}
 
 	writeJSendSuccess(w, http.StatusOK, response)
@@ -194,17 +202,12 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseUser := &domain.User{
-		ID:        user.ID,
-		Username:  user.Username,
-		Email:     user.Email,
-		FullName:  user.FullName,
-		IsActive:  user.IsActive,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-
-	writeJSendSuccess(w, http.StatusOK, responseUser)
+	writeJSendSuccess(w, http.StatusOK, &domain.UserResponse{
+		ID:       user.ID,
+		Username: user.Username,
+		Email:    user.Email,
+		FullName: user.FullName,
+	})
 }
 
 func HealthCheck(w http.ResponseWriter, r *http.Request) {

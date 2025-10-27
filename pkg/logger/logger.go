@@ -2,8 +2,10 @@ package logger
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -12,31 +14,78 @@ import (
 type ContextKey string
 
 const (
-	RequestIDKey ContextKey = "request_id"
-	UserIDKey    ContextKey = "user_id"
-	TimeFormat              = "2006-01-02 15:04:05"
+	TimeFormat = "2006-01-02 15:04:05.000"
 )
 
 type Logger struct {
 	logger zerolog.Logger
 }
 
-func New(level, format string) *Logger {
-	zerolog.TimeFieldFormat = TimeFormat
+type orderedWriter struct {
+	writer io.Writer
+}
 
-	var writer io.Writer = os.Stdout
+func (w *orderedWriter) Write(p []byte) (n int, err error) {
+	var logData map[string]interface{}
+	if err := json.Unmarshal(p, &logData); err != nil {
+		return w.writer.Write(p)
+	}
 
-	if format == "text" {
-		writer = zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: TimeFormat,
+	orderedJSON := "{"
+	first := true
+
+	fieldOrder := []string{
+		"time", "level", "request_id", "method", "path", "status",
+		"duration_ms", "remote_addr", "user_agent", "user_id",
+		"message", "environment", "port", "address", "error",
+	}
+
+	for _, key := range fieldOrder {
+		if val, ok := logData[key]; ok {
+			if !first {
+				orderedJSON += ","
+			}
+			jsonVal, _ := json.Marshal(val)
+			orderedJSON += `"` + key + `":` + string(jsonVal)
+			first = false
+			delete(logData, key)
 		}
 	}
 
+	for key, val := range logData {
+		if !first {
+			orderedJSON += ","
+		}
+		jsonVal, _ := json.Marshal(val)
+		orderedJSON += `"` + key + `":` + string(jsonVal)
+		first = false
+	}
+
+	orderedJSON += "}\n"
+	return w.writer.Write([]byte(orderedJSON))
+}
+
+func New(level, format, filePath string) *Logger {
+	zerolog.TimeFieldFormat = TimeFormat
+
+	var writers []io.Writer
+
+	writers = append(writers, &orderedWriter{writer: os.Stdout})
+
+	if filePath != "" {
+		logDir := filepath.Dir(filePath)
+		if err := os.MkdirAll(logDir, 0755); err == nil {
+			if file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+				writers = append(writers, &orderedWriter{writer: file})
+			}
+		}
+	}
+
+	multiWriter := io.MultiWriter(writers...)
 	logLevel := parseLevel(level)
 	zerolog.SetGlobalLevel(logLevel)
 
-	logger := zerolog.New(writer).
+	logger := zerolog.New(multiWriter).
 		With().
 		Timestamp().
 		Logger()
@@ -60,17 +109,7 @@ func parseLevel(level string) zerolog.Level {
 }
 
 func (l *Logger) WithContext(ctx context.Context) *Logger {
-	logger := l.logger.With()
-
-	if requestID, ok := ctx.Value(RequestIDKey).(string); ok && requestID != "" {
-		logger = logger.Str("request_id", requestID)
-	}
-
-	if userID, ok := ctx.Value(UserIDKey).(string); ok && userID != "" {
-		logger = logger.Str("user_id", userID)
-	}
-
-	return &Logger{logger: logger.Logger()}
+	return l
 }
 
 func (l *Logger) WithField(key string, value interface{}) *Logger {
@@ -129,16 +168,36 @@ func (l *Logger) Fatalf(format string, args ...interface{}) {
 	l.logger.Fatal().Msgf(format, args...)
 }
 
+func (l *Logger) HTTPRequest(method, path string, status int, durationMs int64, remoteAddr, userAgent, requestID string, userID interface{}) {
+	event := l.logger.Info().
+		Str("method", method).
+		Str("path", path).
+		Int("status", status).
+		Int64("duration_ms", durationMs).
+		Str("remote_addr", remoteAddr).
+		Str("user_agent", userAgent)
+
+	if requestID != "" {
+		event = event.Str("request_id", requestID)
+	}
+
+	if userID != nil {
+		event = event.Interface("user_id", userID)
+	}
+
+	event.Msg("")
+}
+
 var global *Logger
 
-func Init(level, format string) {
-	global = New(level, format)
+func Init(level, format, filePath string) {
+	global = New(level, format, filePath)
 	log.Logger = global.logger
 }
 
 func Global() *Logger {
 	if global == nil {
-		global = New("info", "json")
+		global = New("info", "text", "logs/app.log")
 	}
 	return global
 }

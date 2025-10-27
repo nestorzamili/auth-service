@@ -8,6 +8,7 @@ import (
 	"auth-service/internal/repository"
 	apperrors "auth-service/pkg/errors"
 	"auth-service/pkg/logger"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -66,26 +67,19 @@ func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest)
 		return nil, apperrors.Internal("failed to create user")
 	}
 
-	log.WithField("user_id", user.ID).Info("user registered successfully")
-
 	tokens, err := s.generateAndStoreTokens(ctx, user)
 	if err != nil {
 		log.WithError(err).Error("failed to generate tokens after registration")
 		return nil, err
 	}
 
-	responseUser := &domain.User{
-		ID:        user.ID,
-		Username:  user.Username,
-		Email:     user.Email,
-		FullName:  user.FullName,
-		IsActive:  user.IsActive,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-
 	return &domain.AuthResponse{
-		User:   responseUser,
+		User: &domain.UserResponse{
+			ID:       user.ID,
+			Username: user.Username,
+			Email:    user.Email,
+			FullName: user.FullName,
+		},
 		Tokens: tokens,
 	}, nil
 }
@@ -109,26 +103,19 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 		return nil, apperrors.InvalidCredentials()
 	}
 
-	log.WithField("user_id", user.ID).Info("user logged in successfully")
-
 	tokens, err := s.generateAndStoreTokens(ctx, user)
 	if err != nil {
 		log.WithError(err).Error("failed to generate tokens after login")
 		return nil, err
 	}
 
-	responseUser := &domain.User{
-		ID:        user.ID,
-		Username:  user.Username,
-		Email:     user.Email,
-		FullName:  user.FullName,
-		IsActive:  user.IsActive,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-
 	return &domain.AuthResponse{
-		User:   responseUser,
+		User: &domain.UserResponse{
+			ID:       user.ID,
+			Username: user.Username,
+			Email:    user.Email,
+			FullName: user.FullName,
+		},
 		Tokens: tokens,
 	}, nil
 }

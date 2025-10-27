@@ -61,9 +61,16 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
+type UserResponse struct {
+	ID       int64  `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	FullName string `json:"full_name"`
+}
+
 type AuthResponse struct {
-	User   *User      `json:"user"`
-	Tokens *TokenPair `json:"tokens"`
+	User   *UserResponse `json:"user"`
+	Tokens *TokenPair    `json:"tokens"`
 }
 
 type ValidateTokenRequest struct {
