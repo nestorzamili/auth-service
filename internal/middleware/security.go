@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"auth-service/internal/domain"
 	apperrors "auth-service/pkg/errors"
 	"auth-service/pkg/logger"
 
@@ -55,7 +56,18 @@ func Auth(log *logger.Logger, jwtSecret string) func(http.Handler) http.Handler 
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
+			username, _ := claims["username"].(string)
+			email, _ := claims["email"].(string)
+			tokenType, _ := claims["type"].(string)
+
+			domainClaims := &domain.Claims{
+				UserID:   int64(userID),
+				Username: username,
+				Email:    email,
+				Type:     tokenType,
+			}
+
+			ctx := context.WithValue(r.Context(), ClaimsKey, domainClaims)
 			ctx = context.WithValue(ctx, UserIDKey, int64(userID))
 
 			if rw := GetResponseWriter(w); rw != nil {
