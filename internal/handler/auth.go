@@ -54,7 +54,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rw := middleware.GetResponseWriter(w); rw != nil {
-		rw.SetUserID(response.User.ID)
+		rw.SetUserID(response.User.UserID)
 	}
 
 	writeJSendSuccess(w, http.StatusCreated, response)
@@ -89,7 +89,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rw := middleware.GetResponseWriter(w); rw != nil {
-		rw.SetUserID(response.User.ID)
+		rw.SetUserID(response.User.UserID)
 	}
 
 	writeJSendSuccess(w, http.StatusOK, response)
@@ -203,7 +203,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSendSuccess(w, http.StatusOK, &domain.UserResponse{
-		ID:       user.ID,
+		UserID:   user.UserID,
 		Username: user.Username,
 		Email:    user.Email,
 		FullName: user.FullName,

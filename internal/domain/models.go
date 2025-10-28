@@ -5,7 +5,7 @@ import (
 )
 
 type User struct {
-	ID           int64     `json:"id"`
+	UserID       int64     `json:"user_id" db:"user_id"`
 	Username     string    `json:"username"`
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"-"`
@@ -22,22 +22,33 @@ type Claims struct {
 	Type     string `json:"type"` // "access" or "refresh"
 }
 
-type RefreshToken struct {
-	ID        int64      `json:"id"`
-	UserID    int64      `json:"user_id"`
-	Token     string     `json:"token"`
-	ExpiresAt time.Time  `json:"expires_at"`
-	CreatedAt time.Time  `json:"created_at"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty"`
-	IsRevoked bool       `json:"is_revoked"`
+type Session struct {
+	SessionID      int64      `json:"session_id" db:"session_id"`
+	UserID         int64      `json:"user_id"`
+	RefreshToken   string     `json:"refresh_token"`
+	DeviceInfo     string     `json:"device_info,omitempty"`
+	IPAddress      string     `json:"ip_address,omitempty"`
+	UserAgent      string     `json:"user_agent,omitempty"`
+	LastActivityAt time.Time  `json:"last_activity_at"`
+	ExpiresAt      time.Time  `json:"expires_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	IsRevoked      bool       `json:"is_revoked"`
+	RevokedAt      *time.Time `json:"revoked_at,omitempty"`
 }
 
-func (rt *RefreshToken) IsExpired() bool {
-	return time.Now().After(rt.ExpiresAt)
+func (s *Session) IsExpired() bool {
+	return time.Now().After(s.ExpiresAt)
 }
 
-func (rt *RefreshToken) IsValid() bool {
-	return !rt.IsExpired() && !rt.IsRevoked
+func (s *Session) IsValid() bool {
+	return !s.IsExpired() && !s.IsRevoked
+}
+
+type SessionMetadata struct {
+	DeviceInfo string `json:"device_info,omitempty"`
+	IPAddress  string `json:"ip_address,omitempty"`
+	UserAgent  string `json:"user_agent,omitempty"`
 }
 
 type TokenPair struct {
@@ -62,7 +73,7 @@ type RefreshTokenRequest struct {
 }
 
 type UserResponse struct {
-	ID       int64  `json:"id"`
+	UserID   int64  `json:"user_id"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	FullName string `json:"full_name"`

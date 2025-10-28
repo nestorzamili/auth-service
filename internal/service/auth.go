@@ -13,23 +13,23 @@ import (
 )
 
 type AuthService struct {
-	userRepo         repository.UserRepository
-	refreshTokenRepo repository.RefreshTokenRepository
-	jwtService       *JWTService
-	logger           *logger.Logger
+	userRepo    repository.UserRepository
+	sessionRepo repository.SessionRepository
+	jwtService  *JWTService
+	logger      *logger.Logger
 }
 
 func NewAuthService(
 	userRepo repository.UserRepository,
-	refreshTokenRepo repository.RefreshTokenRepository,
+	sessionRepo repository.SessionRepository,
 	jwtService *JWTService,
 	log *logger.Logger,
 ) *AuthService {
 	return &AuthService{
-		userRepo:         userRepo,
-		refreshTokenRepo: refreshTokenRepo,
-		jwtService:       jwtService,
-		logger:           log,
+		userRepo:    userRepo,
+		sessionRepo: sessionRepo,
+		jwtService:  jwtService,
+		logger:      log,
 	}
 }
 
@@ -67,7 +67,9 @@ func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest)
 		return nil, apperrors.Internal("failed to create user")
 	}
 
-	tokens, err := s.generateAndStoreTokens(ctx, user)
+	metadata := s.getSessionMetadataFromContext(ctx)
+
+	tokens, err := s.generateAndStoreTokensWithSession(ctx, user, metadata)
 	if err != nil {
 		log.WithError(err).Error("failed to generate tokens after registration")
 		return nil, err
@@ -75,7 +77,7 @@ func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest)
 
 	return &domain.AuthResponse{
 		User: &domain.UserResponse{
-			ID:       user.ID,
+			UserID:   user.UserID,
 			Username: user.Username,
 			Email:    user.Email,
 			FullName: user.FullName,
@@ -94,24 +96,28 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 	}
 
 	if !user.IsActive {
-		log.WithField("user_id", user.ID).Warn("login failed: user is inactive")
+		log.WithField("user_id", user.UserID).Warn("login failed: user is inactive")
 		return nil, apperrors.Unauthorized("account is inactive")
 	}
 
 	if err := verifyPassword(user.PasswordHash, req.Password); err != nil {
-		log.WithField("user_id", user.ID).Warn("login failed: invalid password")
+		log.WithField("user_id", user.UserID).Warn("login failed: invalid password")
 		return nil, apperrors.InvalidCredentials()
 	}
 
-	tokens, err := s.generateAndStoreTokens(ctx, user)
+	metadata := s.getSessionMetadataFromContext(ctx)
+
+	tokens, err := s.generateAndStoreTokensWithSession(ctx, user, metadata)
 	if err != nil {
 		log.WithError(err).Error("failed to generate tokens after login")
 		return nil, err
 	}
 
+	log.WithField("user_id", user.UserID).Info("user logged in successfully, previous session replaced")
+
 	return &domain.AuthResponse{
 		User: &domain.UserResponse{
-			ID:       user.ID,
+			UserID:   user.UserID,
 			Username: user.Username,
 			Email:    user.Email,
 			FullName: user.FullName,
@@ -129,18 +135,18 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshTokenStr string) 
 		return nil, err
 	}
 
-	storedToken, err := s.refreshTokenRepo.GetByToken(ctx, refreshTokenStr)
+	session, err := s.sessionRepo.GetByRefreshToken(ctx, refreshTokenStr)
 	if err != nil {
-		log.WithError(err).Warn("refresh token not found in database")
+		log.WithError(err).Warn("session not found in database")
 		return nil, apperrors.TokenInvalid().WithDetails(map[string]string{
-			"reason": "token not found or revoked",
+			"reason": "session not found or revoked",
 		})
 	}
 
-	if !storedToken.IsValid() {
-		log.WithField("token_id", storedToken.ID).Warn("refresh token is invalid")
+	if !session.IsValid() {
+		log.WithField("session_id", session.SessionID).Warn("session is invalid")
 		return nil, apperrors.TokenInvalid().WithDetails(map[string]string{
-			"reason": "token expired or revoked",
+			"reason": "session expired or revoked",
 		})
 	}
 
@@ -151,17 +157,19 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshTokenStr string) 
 	}
 
 	if !user.IsActive {
-		log.WithField("user_id", user.ID).Warn("refresh token rejected: user is inactive")
+		log.WithField("user_id", user.UserID).Warn("refresh token rejected: user is inactive")
 		return nil, apperrors.Unauthorized("account is inactive")
 	}
 
-	if err := s.refreshTokenRepo.Revoke(ctx, storedToken.ID); err != nil {
-		log.WithError(err).Error("failed to revoke old refresh token")
+	if err := s.sessionRepo.Revoke(ctx, session.SessionID); err != nil {
+		log.WithError(err).Error("failed to revoke old session")
 	}
 
-	log.WithField("user_id", user.ID).Info("tokens refreshed successfully")
+	metadata := s.getSessionMetadataFromContext(ctx)
 
-	return s.generateAndStoreTokens(ctx, user)
+	log.WithField("user_id", user.UserID).Info("tokens refreshed successfully")
+
+	return s.generateAndStoreTokensWithSession(ctx, user, metadata)
 }
 
 func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*domain.Claims, error) {
@@ -182,7 +190,7 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*doma
 	}
 
 	if !user.IsActive {
-		log.WithField("user_id", user.ID).Warn("token rejected: user is inactive")
+		log.WithField("user_id", user.UserID).Warn("token rejected: user is inactive")
 		return nil, apperrors.Unauthorized("account is inactive")
 	}
 
@@ -192,12 +200,12 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*doma
 func (s *AuthService) Logout(ctx context.Context, userID int64) error {
 	log := s.logger.WithContext(ctx).WithField("user_id", userID)
 
-	if err := s.refreshTokenRepo.RevokeAllByUserID(ctx, userID); err != nil {
-		log.WithError(err).Error("failed to revoke refresh tokens")
+	if err := s.sessionRepo.RevokeAllByUserID(ctx, userID); err != nil {
+		log.WithError(err).Error("failed to revoke sessions")
 		return apperrors.Internal("failed to logout")
 	}
 
-	log.Info("user logged out successfully")
+	log.Info("user logged out successfully, all sessions revoked")
 	return nil
 }
 
@@ -214,23 +222,87 @@ func (s *AuthService) GetUserByID(ctx context.Context, userID int64) (*domain.Us
 	return user, nil
 }
 
-func (s *AuthService) generateAndStoreTokens(ctx context.Context, user *domain.User) (*domain.TokenPair, error) {
+func (s *AuthService) generateAndStoreTokensWithSession(ctx context.Context, user *domain.User, metadata *domain.SessionMetadata) (*domain.TokenPair, error) {
 	tokens, refreshExpiresAt, err := s.jwtService.GenerateTokenPair(user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
 
-	refreshToken := &domain.RefreshToken{
-		UserID:    user.ID,
-		Token:     tokens.RefreshToken,
-		ExpiresAt: refreshExpiresAt,
+	session := &domain.Session{
+		UserID:       user.UserID,
+		RefreshToken: tokens.RefreshToken,
+		ExpiresAt:    refreshExpiresAt,
 	}
 
-	if err := s.refreshTokenRepo.Create(ctx, refreshToken); err != nil {
-		s.logger.WithError(err).Error("failed to store refresh token")
+	if metadata != nil {
+		session.DeviceInfo = metadata.DeviceInfo
+		session.IPAddress = metadata.IPAddress
+		session.UserAgent = metadata.UserAgent
+	}
+
+	if err := s.sessionRepo.ReplaceUserSession(ctx, session); err != nil {
+		s.logger.WithError(err).Error("failed to replace user session")
+		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
 	return tokens, nil
+}
+
+func (s *AuthService) getSessionMetadataFromContext(ctx context.Context) *domain.SessionMetadata {
+	metadata := &domain.SessionMetadata{}
+
+	if ipAddr, ok := ctx.Value("ip_address").(string); ok {
+		metadata.IPAddress = ipAddr
+	}
+
+	if userAgent, ok := ctx.Value("user_agent").(string); ok {
+		metadata.UserAgent = userAgent
+	}
+
+	if deviceInfo, ok := ctx.Value("device_info").(string); ok {
+		metadata.DeviceInfo = deviceInfo
+	}
+
+	return metadata
+}
+
+func (s *AuthService) ValidateSession(ctx context.Context, refreshToken string) (*domain.Session, error) {
+	log := s.logger.WithContext(ctx)
+
+	session, err := s.sessionRepo.GetByRefreshToken(ctx, refreshToken)
+	if err != nil {
+		log.WithError(err).Debug("session not found")
+		return nil, apperrors.NotFound("session")
+	}
+
+	if !session.IsValid() {
+		log.WithField("session_id", session.SessionID).Warn("session is expired or revoked")
+		return nil, apperrors.TokenInvalid().WithDetails(map[string]string{
+			"reason": "session expired or revoked",
+		})
+	}
+
+	if err := s.sessionRepo.UpdateLastActivity(ctx, session.SessionID); err != nil {
+		log.WithError(err).Warn("failed to update session last activity")
+	}
+
+	return session, nil
+}
+
+func (s *AuthService) GetUserSessions(ctx context.Context, userID int64) ([]*domain.Session, error) {
+	return s.sessionRepo.GetAllByUserID(ctx, userID)
+}
+
+func (s *AuthService) CleanupExpiredSessions(ctx context.Context) error {
+	log := s.logger.WithContext(ctx)
+
+	if err := s.sessionRepo.DeleteExpired(ctx); err != nil {
+		log.WithError(err).Error("failed to cleanup expired sessions")
+		return err
+	}
+
+	log.Info("expired sessions cleaned up successfully")
+	return nil
 }
 
 func hashPassword(password string) (string, error) {

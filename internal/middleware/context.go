@@ -10,9 +10,12 @@ import (
 type contextKey string
 
 const (
-	RequestIDKey contextKey = "request_id"
-	UserIDKey    contextKey = "user_id"
-	ClaimsKey    contextKey = "claims"
+	RequestIDKey  contextKey = "request_id"
+	UserIDKey     contextKey = "user_id"
+	ClaimsKey     contextKey = "claims"
+	IPAddressKey  contextKey = "ip_address"
+	UserAgentKey  contextKey = "user_agent"
+	DeviceInfoKey contextKey = "device_info"
 )
 
 type responseWriter struct {

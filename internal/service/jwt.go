@@ -52,7 +52,7 @@ func (s *JWTService) generateToken(user *domain.User, tokenType string, expiry t
 	expiresAt := now.Add(expiry)
 
 	claims := customClaims{
-		UserID:   user.ID,
+		UserID:   user.UserID,
 		Username: user.Username,
 		Email:    user.Email,
 		Type:     tokenType,
@@ -61,7 +61,7 @@ func (s *JWTService) generateToken(user *domain.User, tokenType string, expiry t
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
 			Issuer:    s.config.Issuer,
-			Subject:   fmt.Sprintf("%d", user.ID),
+			Subject:   fmt.Sprintf("%d", user.UserID),
 			ID:        generateJTI(),
 		},
 	}

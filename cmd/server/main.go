@@ -46,12 +46,14 @@ func main() {
 	log.Info("successfully connected to PostgreSQL database")
 
 	userRepo := repository.NewPostgresUserRepository(db)
-	refreshTokenRepo := repository.NewPostgresRefreshTokenRepository(db)
+	sessionRepo := repository.NewPostgresSessionRepository(db)
 
 	jwtService := service.NewJWTService(&cfg.JWT)
-	authService := service.NewAuthService(userRepo, refreshTokenRepo, jwtService, log)
+	authService := service.NewAuthService(userRepo, sessionRepo, jwtService, log)
 
 	authHandler := handler.NewAuthHandler(authService, log)
+
+	StartSessionCleanup(authService, log, 24*time.Hour)
 
 	router := setupRouter(authHandler, cfg, log)
 
@@ -108,6 +110,8 @@ func setupRouter(authHandler *handler.AuthHandler, cfg *config.Config, log *logg
 	apiHandler = middleware.MaxBodySize(log, 1<<20)(apiHandler)
 
 	apiHandler = middleware.ValidateContentType(log, "application/json")(apiHandler)
+
+	apiHandler = middleware.SessionMetadata(apiHandler)
 
 	apiHandler = middleware.CORS(cfg.Server.AllowedOrigins)(apiHandler)
 
