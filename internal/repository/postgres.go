@@ -9,6 +9,7 @@ import (
 	"auth-service/internal/domain"
 	apperrors "auth-service/pkg/errors"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -29,6 +30,7 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *domain.User) 
 	`
 
 	now := time.Now()
+	user.UserID = uuid.New()
 	err := r.db.QueryRow(
 		ctx,
 		query,
@@ -54,7 +56,7 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *domain.User) 
 	return nil
 }
 
-func (r *PostgresUserRepository) GetByID(ctx context.Context, userID int64) (*domain.User, error) {
+func (r *PostgresUserRepository) GetByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
 	query := `
 		SELECT user_id, username, email, password_hash, full_name, is_active, created_at, updated_at
 		FROM users
@@ -171,7 +173,7 @@ func (r *PostgresUserRepository) Update(ctx context.Context, user *domain.User) 
 	return nil
 }
 
-func (r *PostgresUserRepository) Delete(ctx context.Context, userID int64) error {
+func (r *PostgresUserRepository) Delete(ctx context.Context, userID uuid.UUID) error {
 	query := `DELETE FROM users WHERE user_id = $1`
 
 	result, err := r.db.Exec(ctx, query, userID)
@@ -206,14 +208,31 @@ func (r *PostgresSessionRepository) Create(ctx context.Context, session *domain.
 	`
 
 	now := time.Now()
+	
+	// Convert empty strings to nil for nullable fields
+	var ipAddress interface{} = session.IPAddress
+	if session.IPAddress == "" {
+		ipAddress = nil
+	}
+	
+	var deviceInfo interface{} = session.DeviceInfo
+	if session.DeviceInfo == "" {
+		deviceInfo = nil
+	}
+	
+	var userAgent interface{} = session.UserAgent
+	if session.UserAgent == "" {
+		userAgent = nil
+	}
+	
 	err := r.db.QueryRow(
 		ctx,
 		query,
 		session.UserID,
 		session.RefreshToken,
-		session.DeviceInfo,
-		session.IPAddress,
-		session.UserAgent,
+		deviceInfo,
+		ipAddress,
+		userAgent,
 		now,
 		session.ExpiresAt,
 		now,
@@ -263,7 +282,7 @@ func (r *PostgresSessionRepository) GetByRefreshToken(ctx context.Context, refre
 	return session, nil
 }
 
-func (r *PostgresSessionRepository) GetByUserID(ctx context.Context, userID int64) (*domain.Session, error) {
+func (r *PostgresSessionRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.Session, error) {
 	query := `
 		SELECT session_id, user_id, refresh_token, device_info, 
 		       ip_address, user_agent, last_activity_at, expires_at, 
@@ -300,7 +319,7 @@ func (r *PostgresSessionRepository) GetByUserID(ctx context.Context, userID int6
 	return session, nil
 }
 
-func (r *PostgresSessionRepository) GetAllByUserID(ctx context.Context, userID int64) ([]*domain.Session, error) {
+func (r *PostgresSessionRepository) GetAllByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Session, error) {
 	query := `
 		SELECT session_id, user_id, refresh_token, device_info, 
 		       ip_address, user_agent, last_activity_at, expires_at, 
@@ -342,7 +361,7 @@ func (r *PostgresSessionRepository) GetAllByUserID(ctx context.Context, userID i
 	return sessions, nil
 }
 
-func (r *PostgresSessionRepository) UpdateLastActivity(ctx context.Context, sessionID int64) error {
+func (r *PostgresSessionRepository) UpdateLastActivity(ctx context.Context, sessionID uuid.UUID) error {
 	query := `
 		UPDATE sessions
 		SET last_activity_at = $1, updated_at = $2
@@ -362,7 +381,7 @@ func (r *PostgresSessionRepository) UpdateLastActivity(ctx context.Context, sess
 	return nil
 }
 
-func (r *PostgresSessionRepository) Revoke(ctx context.Context, sessionID int64) error {
+func (r *PostgresSessionRepository) Revoke(ctx context.Context, sessionID uuid.UUID) error {
 	query := `
 		UPDATE sessions
 		SET is_revoked = true, revoked_at = $1, updated_at = $2
@@ -382,7 +401,7 @@ func (r *PostgresSessionRepository) Revoke(ctx context.Context, sessionID int64)
 	return nil
 }
 
-func (r *PostgresSessionRepository) RevokeAllByUserID(ctx context.Context, userID int64) error {
+func (r *PostgresSessionRepository) RevokeAllByUserID(ctx context.Context, userID uuid.UUID) error {
 	query := `
 		UPDATE sessions
 		SET is_revoked = true, revoked_at = $1, updated_at = $2
@@ -398,7 +417,7 @@ func (r *PostgresSessionRepository) RevokeAllByUserID(ctx context.Context, userI
 	return nil
 }
 
-func (r *PostgresSessionRepository) DeleteByID(ctx context.Context, sessionID int64) error {
+func (r *PostgresSessionRepository) DeleteByID(ctx context.Context, sessionID uuid.UUID) error {
 	query := `DELETE FROM sessions WHERE session_id = $1`
 
 	result, err := r.db.Exec(ctx, query, sessionID)
@@ -413,7 +432,7 @@ func (r *PostgresSessionRepository) DeleteByID(ctx context.Context, sessionID in
 	return nil
 }
 
-func (r *PostgresSessionRepository) DeleteByUserID(ctx context.Context, userID int64) error {
+func (r *PostgresSessionRepository) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
 	query := `DELETE FROM sessions WHERE user_id = $1`
 
 	_, err := r.db.Exec(ctx, query, userID)
@@ -461,14 +480,31 @@ func (r *PostgresSessionRepository) ReplaceUserSession(ctx context.Context, sess
 	`
 
 	now := time.Now()
+	
+	// Convert empty strings to nil for nullable fields
+	var ipAddress interface{} = session.IPAddress
+	if session.IPAddress == "" {
+		ipAddress = nil
+	}
+	
+	var deviceInfo interface{} = session.DeviceInfo
+	if session.DeviceInfo == "" {
+		deviceInfo = nil
+	}
+	
+	var userAgent interface{} = session.UserAgent
+	if session.UserAgent == "" {
+		userAgent = nil
+	}
+	
 	err = tx.QueryRow(
 		ctx,
 		insertQuery,
 		session.UserID,
 		session.RefreshToken,
-		session.DeviceInfo,
-		session.IPAddress,
-		session.UserAgent,
+		deviceInfo,
+		ipAddress,
+		userAgent,
 		now,
 		session.ExpiresAt,
 		now,

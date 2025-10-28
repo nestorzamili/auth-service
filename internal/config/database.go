@@ -49,8 +49,10 @@ func RunMigrations(pool *pgxpool.Pool) error {
 	ctx := context.Background()
 
 	migrations := []string{
-		`CREATE TABLE IF NOT EXISTS users (
-			id BIGSERIAL PRIMARY KEY,
+		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+		
+		CREATE TABLE IF NOT EXISTS users (
+			user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 			username VARCHAR(30) NOT NULL UNIQUE,
 			email VARCHAR(255) NOT NULL UNIQUE,
 			password_hash VARCHAR(255) NOT NULL,
@@ -63,19 +65,26 @@ func RunMigrations(pool *pgxpool.Pool) error {
 		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 		CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);`,
 
-		`CREATE TABLE IF NOT EXISTS refresh_tokens (
-			id BIGSERIAL PRIMARY KEY,
-			user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			token TEXT NOT NULL UNIQUE,
+		`CREATE TABLE IF NOT EXISTS sessions (
+			session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+			refresh_token TEXT NOT NULL UNIQUE,
+			device_info TEXT,
+			ip_address INET,
+			user_agent TEXT,
+			last_activity_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			expires_at TIMESTAMP NOT NULL,
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			revoked_at TIMESTAMP,
-			is_revoked BOOLEAN NOT NULL DEFAULT false
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			is_revoked BOOLEAN NOT NULL DEFAULT false,
+			revoked_at TIMESTAMP
 		);
-		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
-		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
-		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
-		CREATE INDEX IF NOT EXISTS idx_refresh_tokens_is_revoked ON refresh_tokens(is_revoked);`,
+		CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+		CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON sessions(refresh_token);
+		CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+		CREATE INDEX IF NOT EXISTS idx_sessions_last_activity ON sessions(last_activity_at);
+		CREATE INDEX IF NOT EXISTS idx_sessions_is_revoked ON sessions(is_revoked);
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_user_id_active ON sessions(user_id) WHERE is_revoked = false;`,
 	}
 
 	for i, migration := range migrations {

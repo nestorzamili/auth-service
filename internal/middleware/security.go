@@ -10,6 +10,7 @@ import (
 	"auth-service/pkg/logger"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 func Auth(log *logger.Logger, jwtSecret string) func(http.Handler) http.Handler {
@@ -48,9 +49,17 @@ func Auth(log *logger.Logger, jwtSecret string) func(http.Handler) http.Handler 
 				return
 			}
 
-			userID, ok := claims["user_id"].(float64)
+			userIDStr, ok := claims["user_id"].(string)
 			if !ok {
 				log.WithContext(r.Context()).Warn("user_id not found in token claims")
+				appErr := apperrors.Unauthorized("invalid token claims")
+				writeJSONError(w, appErr)
+				return
+			}
+
+			userID, err := uuid.Parse(userIDStr)
+			if err != nil {
+				log.WithContext(r.Context()).Warn("invalid user_id format in token")
 				appErr := apperrors.Unauthorized("invalid token claims")
 				writeJSONError(w, appErr)
 				return
@@ -61,17 +70,17 @@ func Auth(log *logger.Logger, jwtSecret string) func(http.Handler) http.Handler 
 			tokenType, _ := claims["type"].(string)
 
 			domainClaims := &domain.Claims{
-				UserID:   int64(userID),
+				UserID:   userID,
 				Username: username,
 				Email:    email,
 				Type:     tokenType,
 			}
 
 			ctx := context.WithValue(r.Context(), ClaimsKey, domainClaims)
-			ctx = context.WithValue(ctx, UserIDKey, int64(userID))
+			ctx = context.WithValue(ctx, UserIDKey, userID)
 
 			if rw := GetResponseWriter(w); rw != nil {
-				rw.SetUserID(int64(userID))
+				rw.SetUserID(userID)
 			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))

@@ -9,6 +9,7 @@ import (
 	apperrors "auth-service/pkg/errors"
 	"auth-service/pkg/logger"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -197,7 +198,7 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*doma
 	return claims, nil
 }
 
-func (s *AuthService) Logout(ctx context.Context, userID int64) error {
+func (s *AuthService) Logout(ctx context.Context, userID uuid.UUID) error {
 	log := s.logger.WithContext(ctx).WithField("user_id", userID)
 
 	if err := s.sessionRepo.RevokeAllByUserID(ctx, userID); err != nil {
@@ -209,7 +210,7 @@ func (s *AuthService) Logout(ctx context.Context, userID int64) error {
 	return nil
 }
 
-func (s *AuthService) GetUserByID(ctx context.Context, userID int64) (*domain.User, error) {
+func (s *AuthService) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, apperrors.NotFound("user")
@@ -289,7 +290,7 @@ func (s *AuthService) ValidateSession(ctx context.Context, refreshToken string) 
 	return session, nil
 }
 
-func (s *AuthService) GetUserSessions(ctx context.Context, userID int64) ([]*domain.Session, error) {
+func (s *AuthService) GetUserSessions(ctx context.Context, userID uuid.UUID) ([]*domain.Session, error) {
 	return s.sessionRepo.GetAllByUserID(ctx, userID)
 }
 

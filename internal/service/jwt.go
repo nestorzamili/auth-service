@@ -9,7 +9,9 @@ import (
 	"auth-service/internal/config"
 	"auth-service/internal/domain"
 	apperrors "auth-service/pkg/errors"
+
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type JWTService struct {
@@ -23,10 +25,10 @@ func NewJWTService(cfg *config.JWTConfig) *JWTService {
 }
 
 type customClaims struct {
-	UserID   int64  `json:"user_id"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Type     string `json:"type"`
+	UserID   uuid.UUID `json:"user_id"`
+	Username string    `json:"username"`
+	Email    string    `json:"email"`
+	Type     string    `json:"type"`
 	jwt.RegisteredClaims
 }
 

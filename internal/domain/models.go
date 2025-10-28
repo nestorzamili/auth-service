@@ -2,10 +2,12 @@ package domain
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type User struct {
-	UserID       int64     `json:"user_id" db:"user_id"`
+	UserID       uuid.UUID `json:"user_id" db:"user_id"`
 	Username     string    `json:"username"`
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"-"`
@@ -16,15 +18,15 @@ type User struct {
 }
 
 type Claims struct {
-	UserID   int64  `json:"user_id"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Type     string `json:"type"` // "access" or "refresh"
+	UserID   uuid.UUID `json:"user_id"`
+	Username string    `json:"username"`
+	Email    string    `json:"email"`
+	Type     string    `json:"type"` // "access" or "refresh"
 }
 
 type Session struct {
-	SessionID      int64      `json:"session_id" db:"session_id"`
-	UserID         int64      `json:"user_id"`
+	SessionID      uuid.UUID  `json:"session_id" db:"session_id"`
+	UserID         uuid.UUID  `json:"user_id"`
 	RefreshToken   string     `json:"refresh_token"`
 	DeviceInfo     string     `json:"device_info,omitempty"`
 	IPAddress      string     `json:"ip_address,omitempty"`
@@ -73,10 +75,10 @@ type RefreshTokenRequest struct {
 }
 
 type UserResponse struct {
-	UserID   int64  `json:"user_id"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	FullName string `json:"full_name"`
+	UserID   uuid.UUID `json:"user_id"`
+	Username string    `json:"username"`
+	Email    string    `json:"email"`
+	FullName string    `json:"full_name"`
 }
 
 type AuthResponse struct {

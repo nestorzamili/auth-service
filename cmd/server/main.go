@@ -45,6 +45,12 @@ func main() {
 
 	log.Info("successfully connected to PostgreSQL database")
 
+	log.Info("running database migrations")
+	if err := config.RunMigrations(db); err != nil {
+		log.WithError(err).Fatal("failed to run database migrations")
+	}
+	log.Info("database migrations completed successfully")
+
 	userRepo := repository.NewPostgresUserRepository(db)
 	sessionRepo := repository.NewPostgresSessionRepository(db)
 
