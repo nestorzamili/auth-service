@@ -208,23 +208,23 @@ func (r *PostgresSessionRepository) Create(ctx context.Context, session *domain.
 	`
 
 	now := time.Now()
-	
+
 	// Convert empty strings to nil for nullable fields
 	var ipAddress interface{} = session.IPAddress
 	if session.IPAddress == "" {
 		ipAddress = nil
 	}
-	
+
 	var deviceInfo interface{} = session.DeviceInfo
 	if session.DeviceInfo == "" {
 		deviceInfo = nil
 	}
-	
+
 	var userAgent interface{} = session.UserAgent
 	if session.UserAgent == "" {
 		userAgent = nil
 	}
-	
+
 	err := r.db.QueryRow(
 		ctx,
 		query,
@@ -480,23 +480,23 @@ func (r *PostgresSessionRepository) ReplaceUserSession(ctx context.Context, sess
 	`
 
 	now := time.Now()
-	
+
 	// Convert empty strings to nil for nullable fields
 	var ipAddress interface{} = session.IPAddress
 	if session.IPAddress == "" {
 		ipAddress = nil
 	}
-	
+
 	var deviceInfo interface{} = session.DeviceInfo
 	if session.DeviceInfo == "" {
 		deviceInfo = nil
 	}
-	
+
 	var userAgent interface{} = session.UserAgent
 	if session.UserAgent == "" {
 		userAgent = nil
 	}
-	
+
 	err = tx.QueryRow(
 		ctx,
 		insertQuery,
