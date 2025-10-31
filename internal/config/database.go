@@ -48,12 +48,16 @@ func NewPostgresConnection(cfg *DatabaseConfig) (*pgxpool.Pool, error) {
 func RunMigrations(pool *pgxpool.Pool) error {
 	ctx := context.Background()
 
+	// First, ensure the extension is created in the public schema
+	if _, err := pool.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;`); err != nil {
+		return fmt.Errorf("failed to create uuid-ossp extension: %w", err)
+	}
+
 	migrations := []string{
 		`CREATE SCHEMA IF NOT EXISTS users;
-		CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA users;
 		
 		CREATE TABLE IF NOT EXISTS users.users (
-			user_id UUID PRIMARY KEY DEFAULT users.uuid_generate_v4(),
+			user_id UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
 			username VARCHAR(30) NOT NULL UNIQUE,
 			email VARCHAR(255) NOT NULL UNIQUE,
 			password_hash VARCHAR(255) NOT NULL,
@@ -67,7 +71,7 @@ func RunMigrations(pool *pgxpool.Pool) error {
 		CREATE INDEX IF NOT EXISTS idx_users_is_active ON users.users(is_active);`,
 
 		`CREATE TABLE IF NOT EXISTS users.sessions (
-			session_id UUID PRIMARY KEY DEFAULT users.uuid_generate_v4(),
+			session_id UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
 			user_id UUID NOT NULL REFERENCES users.users(user_id) ON DELETE CASCADE,
 			refresh_token TEXT NOT NULL UNIQUE,
 			device_info TEXT,

@@ -1,9 +1,9 @@
 CREATE SCHEMA IF NOT EXISTS users;
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA users;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE IF NOT EXISTS users.users (
-    user_id UUID PRIMARY KEY DEFAULT users.uuid_generate_v4(),
+    user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(30) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
